@@ -80,7 +80,8 @@ int chrdrv_init(struct omap_i2c_dev *i2c_dev)
 		return ret;
 	}
 
-	printk(KERN_INFO "chrdrv_init successful");
+	printk(KERN_ALERT "chrdrv_init successful- ass02 1\n");
+	printk(KERN_INFO "chrdrv_init successful- ass02 2\n");
 	return 0;
 }
 

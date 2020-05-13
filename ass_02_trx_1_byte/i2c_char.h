@@ -11,6 +11,9 @@
 #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
 #define ENTER() printk("\n###### In %s ######\n", __func__);
 
+#define OMAP_I2C_BASE      0x44E0B000
+#define OMAP_I2C_REG_SIZE  0x1000
+
 /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
 enum {
 	OMAP_I2C_REV_REG = 0,

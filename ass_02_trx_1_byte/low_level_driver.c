@@ -102,11 +102,15 @@ int i2c_transmit(struct i2c_msg *msg, size_t count)
 	int i2c_error = 0;
 	/* Initialize the loop variable */
 	int k = 7;
+	u16 update_status;
 
 	//Set the TX FIFO Threshold to 0 and clear the FIFO's
 	omap_i2c_write_reg(&i2c_dev, OMAP_I2C_BUF_REG, 0);
 	//TODO: Update the slave addresss register with 0x50
+	omap_i2c_write_reg(&i2c_dev, OMAP_I2C_SA_REG, 0x50);
 	//TODO: Update the count register with 1
+	omap_i2c_write_reg(&i2c_dev, OMAP_I2C_CNT_REG, 1);
+
 	printk("##### Sending %d byte(s) on the I2C bus ####\n", cnt);
 
 	/*
@@ -117,7 +121,12 @@ int i2c_transmit(struct i2c_msg *msg, size_t count)
 	 * So, for start bit, the macro is OMAP_I2C_CON_STT. Check I2c_char.h for other bits
 	 */
 
+	w = (OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_TRX | OMAP_I2C_CON_STP | OMAP_I2C_CON_STT);
+
+	omap_i2c_write_reg(&i2c_dev, OMAP_I2C_CON_REG, w);
+
 	while (k--) {
+		printk("while loop k =%d\n",k);
 		// Wait for status to be updated
 		status = wait_for_event(&i2c_dev);
 		if (status == 0) {
@@ -125,23 +134,31 @@ int i2c_transmit(struct i2c_msg *msg, size_t count)
 			goto wr_exit;
 		}
 		//TODO: Check the status to verify if XRDY is received
-		//TODO: Update the data register with data to be transmitted
+		//TODO: Update the data register with data to be transmitted		
 		//TODO: Clear the XRDY event with omap_i2c_ack_stat
-		if (status) {
+		
+		if (status & OMAP_I2C_STAT_XRDY) {
 			printk("Got XRDY\n");
+
+			omap_i2c_write_reg(&i2c_dev, OMAP_I2C_DATA_REG, 0x88);
+			omap_i2c_ack_stat(&i2c_dev, OMAP_I2C_STAT_XRDY);
+
 			continue;   
 		}
 
-		//TODO: Check the status to verify if ARDY is received
+
 		//TODO: Clear the XRDY event with omap_i2c_ack_stat
-		if (status) {	
+		if (status & OMAP_I2C_STAT_ARDY) {	
 			printk("Got ARDY\n");
+			omap_i2c_ack_stat(&i2c_dev, OMAP_I2C_STAT_ARDY);
 			break;
 		}
 	}
+	
 	if (k <= 0) {
 		printk("TX Timed out\n");
 		i2c_error = -ETIMEDOUT;
+		//goto wr_exit;
 	}
 wr_exit:
 	flush_fifo(&i2c_dev);
@@ -165,6 +182,7 @@ static void omap_i2c_set_speed(struct omap_i2c_dev *dev)
 	/* Compute prescaler divisor */
 	psc = fclk_rate / internal_clk;
 	//TODO: Update the prescalar register with psc - 1
+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, psc - 1);
 
 	// Hard coding the speed to 400KHz
 	dev->speed = 400;
@@ -175,6 +193,8 @@ static void omap_i2c_set_speed(struct omap_i2c_dev *dev)
         sclh = scl - 5;
 
 	//TODO: Update the SCL low and high registers as per above calculations
+	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, scll);
+	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, sclh);
 }
 
 int omap_i2c_init(struct omap_i2c_dev *dev)
@@ -186,11 +206,19 @@ int omap_i2c_init(struct omap_i2c_dev *dev)
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
 	
 	// TODO: Update the 'iestate' field with desired events such as XRDY
+	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+                        OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK );
+
 	// TODO: Update the OMAP_I2C_IE_REG register
+	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+
+
 
 	flush_fifo(dev);
 	omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, 0XFFFF);
 	omap_i2c_wait_for_bb(dev);
+
+	printk(KERN_ALERT "TONY: omap_i2c_init done\n");
 
 	return 0;
 }
@@ -217,6 +245,16 @@ static int __init omap_i2c_init_driver(void)
 	 * in 'base' field of omap_i2c_dev. 
 	 * Use API void __iomem* ioremap((resource_size_t offset, unsigned long size)
 	*/
+
+	i2c_dev.base = ioremap(OMAP_I2C_BASE, OMAP_I2C_REG_SIZE);
+
+	if (IS_ERR(i2c_dev.base))
+	{
+
+		printk(KERN_ALERT "TONY: i2c base register mapping not working\n");
+	}
+
+	printk(KERN_ALERT "TONY: i2c base register mapping done\n");
 
 	i2c_dev.regs = (u8 *)reg_map_ip_v2;
 	omap_i2c_init(&i2c_dev);
