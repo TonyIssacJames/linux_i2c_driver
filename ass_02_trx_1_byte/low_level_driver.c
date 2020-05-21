@@ -182,7 +182,7 @@ static void omap_i2c_set_speed(struct omap_i2c_dev *dev)
 	/* Compute prescaler divisor */
 	psc = fclk_rate / internal_clk;
 	//TODO: Update the prescalar register with psc - 1
-	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, psc - 1);
+	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, psc - 1);
 
 	// Hard coding the speed to 400KHz
 	dev->speed = 400;
